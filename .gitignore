@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Model checkpoints (too large for git)
+*.pth
+
+# Raw data directories (downloaded per-organ, deleted after training)
+data/LUNA16/
+data/LiTS/
+data/MSD_Pancreas/
+data/patches/
+data/liver_patches/
+data/pancreas_patches/
+
+# Windows artifacts
+nul
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+*.log
