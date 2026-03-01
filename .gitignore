@@ -11,6 +11,8 @@ __pycache__/
 # Raw data directories (downloaded per-organ, deleted after training)
 data/LUNA16/
 data/LiTS/
+data/Task03_Liver/
+data/Task07_Pancreas/
 data/MSD_Pancreas/
 data/patches/
 data/liver_patches/

@@ -1,5 +1,5 @@
 """
-LiTS Liver Tumor Classification - Multi-Model 3-Fold Cross-Validation Pipeline
+MSD Task03 Liver Tumor Classification - Multi-Model 3-Fold Cross-Validation Pipeline
 
 Uses pre-extracted .npy patches for fast training.
 Run preextract_liver.py FIRST to create the patch files.
@@ -65,7 +65,7 @@ PLOT_DIR = os.path.join(RESULTS_DIR, "plots")
 # Label names for display and Grad-CAM
 POS_LABEL = "Tumor"
 NEG_LABEL = "Non-tumor"
-ORGAN_NAME = "LiTS Liver Tumor"
+ORGAN_NAME = "MSD Liver Tumor"
 
 # Models to train and compare
 # Each entry: (display_name, architecture_key, gradcam_target_layer_path)
@@ -766,7 +766,7 @@ def main():
 
     print(f"\n  METHODOLOGY:")
     print(f"    Organ:           Liver")
-    print(f"    Dataset:         LiTS (Liver Tumor Segmentation Challenge)")
+    print(f"    Dataset:         MSD Task03 Liver (Medical Segmentation Decathlon)")
     print(f"    Task:            Binary classification ({POS_LABEL} vs {NEG_LABEL})")
     print(f"    Validation:      {K_FOLDS}-fold cross-validation")
     print(f"    Split strategy:  Patient-level (prevents data leakage)")

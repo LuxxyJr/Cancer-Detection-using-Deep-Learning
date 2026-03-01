@@ -92,7 +92,7 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ### Liver Cancer Detection — In Progress
 
-**Dataset:** [LiTS](https://competitions.codalab.org/competitions/17094) (131 contrast-enhanced CT scans with pixel-level segmentation masks)
+**Dataset:** [Medical Segmentation Decathlon — Task03 Liver](http://medicaldecathlon.com/) (131 training CT scans with pixel-level segmentation masks)
 
 **Preprocessing:** NIfTI volumes resampled to 1 mm isotropic, HU-windowed to [-200, 300] for liver parenchyma. Tumor centroids extracted from connected components in segmentation masks. Negatives sampled from verified tumor-free liver regions.
 
@@ -167,11 +167,12 @@ python src/main.py
 ### Running the Liver Pipeline
 
 ```bash
-# Step 1: Download LiTS dataset to data/LiTS/
-# Step 2: Extract patches (run once, ~30-60 minutes)
+# Step 1: Download Task03_Liver.tar from http://medicaldecathlon.com/dataaws/
+# Step 2: Extract to data/Task03_Liver/
+# Step 3: Extract patches (run once, ~30-60 minutes)
 python src/preextract_liver.py
 
-# Step 3: Train both models with 3-fold CV
+# Step 4: Train both models with 3-fold CV
 python src/main_liver.py
 ```
 

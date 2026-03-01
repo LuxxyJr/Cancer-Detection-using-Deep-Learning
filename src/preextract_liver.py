@@ -1,5 +1,5 @@
 """
-LiTS LIVER TUMOR - PATCH PRE-EXTRACTION (run this ONCE before training)
+MSD TASK03 LIVER TUMOR - PATCH PRE-EXTRACTION (run this ONCE before training)
 
 Loads each CT volume + segmentation mask, resamples to isotropic 1mm spacing,
 extracts tumor-centered patches (positive) and liver-only patches (negative),
@@ -9,9 +9,12 @@ Output format is identical to the lung pipeline (manifest.csv + .npy patches),
 so the same training code (main_liver.py) works without changes.
 
 Data format:
-  LiTS provides NIfTI files (.nii / .nii.gz):
-    - volume-{id}.nii(.gz)       CT scan
-    - segmentation-{id}.nii(.gz) Mask (0=bg, 1=liver, 2=tumor)
+  Medical Segmentation Decathlon Task03_Liver provides NIfTI files:
+    - imagesTr/liver_{id}.nii.gz   CT scan (131 training volumes)
+    - labelsTr/liver_{id}.nii.gz   Mask (0=bg, 1=liver, 2=tumor)
+
+  Download: http://medicaldecathlon.com/dataaws/
+  Extract Task03_Liver.tar into data/Task03_Liver/
 
 Usage:  python preextract_liver.py
 Time:   ~30-60 minutes
@@ -45,53 +48,55 @@ LARGE_TUMOR_THRESHOLD = 1000       # Tumors larger than this (in voxels) get ext
 HU_MIN = -200.0
 HU_MAX = 300.0
 
-LITS_FOLDER = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\LiTS"
+MSD_LIVER_FOLDER = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\Task03_Liver"
 OUTPUT_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\liver_patches"
 # ──────────────────────────────────────────────────────────────────────
 
 
-def find_volume_pairs(lits_folder):
+def find_volume_pairs(msd_folder):
     """
-    Find all volume-segmentation pairs in LiTS folder.
+    Find all image-label pairs in MSD Task03_Liver folder.
 
-    Handles:
-      - Flat directory: volume-0.nii(.gz) + segmentation-0.nii(.gz) in same dir
-      - Batched: files in subdirectories (Training Batch 1, etc.)
-      - Both .nii and .nii.gz extensions
+    Expected structure:
+      Task03_Liver/
+        imagesTr/liver_0.nii.gz, liver_1.nii.gz, ...
+        labelsTr/liver_0.nii.gz, liver_1.nii.gz, ...
 
     Returns:
         dict: {volume_id: {"volume": path, "segmentation": path}}
     """
     pairs = {}
+    images_dir = os.path.join(msd_folder, "imagesTr")
+    labels_dir = os.path.join(msd_folder, "labelsTr")
 
-    for root, dirs, files in os.walk(lits_folder):
-        for fname in files:
-            fpath = os.path.join(root, fname)
+    if not os.path.isdir(images_dir):
+        print(f"  ERROR: imagesTr directory not found at {images_dir}")
+        return {}
+    if not os.path.isdir(labels_dir):
+        print(f"  ERROR: labelsTr directory not found at {labels_dir}")
+        return {}
 
-            # Match volume files
-            vol_match = re.match(r"volume-(\d+)\.nii(?:\.gz)?$", fname)
-            if vol_match:
-                vid = int(vol_match.group(1))
-                if vid not in pairs:
-                    pairs[vid] = {}
-                pairs[vid]["volume"] = fpath
+    for fname in os.listdir(images_dir):
+        match = re.match(r"liver_(\d+)\.nii(?:\.gz)?$", fname)
+        if match:
+            vid = int(match.group(1))
+            pairs[vid] = {"volume": os.path.join(images_dir, fname)}
 
-            # Match segmentation files
-            seg_match = re.match(r"segmentation-(\d+)\.nii(?:\.gz)?$", fname)
-            if seg_match:
-                vid = int(seg_match.group(1))
-                if vid not in pairs:
-                    pairs[vid] = {}
-                pairs[vid]["segmentation"] = fpath
-
-    # Filter to only complete pairs
+    # Match with label files
     complete = {}
     for vid, paths in sorted(pairs.items()):
-        if "volume" in paths and "segmentation" in paths:
-            complete[vid] = paths
-        else:
-            missing = "segmentation" if "volume" in paths else "volume"
-            print(f"  WARNING: Volume {vid} missing {missing} file, skipping")
+        # Try both .nii.gz and .nii
+        label_found = False
+        for ext in [".nii.gz", ".nii"]:
+            label_path = os.path.join(labels_dir, f"liver_{vid}{ext}")
+            if os.path.isfile(label_path):
+                paths["segmentation"] = label_path
+                complete[vid] = paths
+                label_found = True
+                break
+
+        if not label_found:
+            print(f"  WARNING: Volume {vid} has no matching label file, skipping")
 
     return complete
 
@@ -298,21 +303,23 @@ def main():
     rng = random.Random(SEED)
 
     print("\n" + "=" * 70)
-    print("  LiTS LIVER TUMOR - PATCH PRE-EXTRACTION")
+    print("  MSD TASK03 LIVER TUMOR - PATCH PRE-EXTRACTION")
     print("  Run this ONCE. Then run main_liver.py for training.")
     print("=" * 70 + "\n")
 
     # Find volume-segmentation pairs
-    pairs = find_volume_pairs(LITS_FOLDER)
-    print(f"  Found {len(pairs)} volume-segmentation pairs in {LITS_FOLDER}")
+    pairs = find_volume_pairs(MSD_LIVER_FOLDER)
+    print(f"  Found {len(pairs)} volume-segmentation pairs in {MSD_LIVER_FOLDER}")
     print(f"  Resampling to:   {TARGET_SPACING[0]:.0f}x{TARGET_SPACING[1]:.0f}x{TARGET_SPACING[2]:.0f} mm isotropic spacing")
     print(f"  Patch size:      {PATCH_SIZE[0]}x{PATCH_SIZE[1]}x{PATCH_SIZE[2]}")
     print(f"  HU window:       [{HU_MIN:.0f}, {HU_MAX:.0f}]")
 
     if len(pairs) == 0:
         print("\n  ERROR: No volume-segmentation pairs found!")
-        print(f"  Expected files like 'volume-0.nii(.gz)' and 'segmentation-0.nii(.gz)'")
-        print(f"  in {LITS_FOLDER} (or subdirectories)")
+        print(f"  Expected structure:")
+        print(f"    {MSD_LIVER_FOLDER}/imagesTr/liver_0.nii.gz")
+        print(f"    {MSD_LIVER_FOLDER}/labelsTr/liver_0.nii.gz")
+        print(f"  Download Task03_Liver.tar from http://medicaldecathlon.com/dataaws/")
         return
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -357,7 +364,7 @@ def main():
             manifest.append({
                 "filename": filename,
                 "label": 1,
-                "seriesuid": f"volume-{vid}",
+                "seriesuid": f"liver_{vid}",
             })
             patch_idx += 1
             total_pos_patches += 1
@@ -376,7 +383,7 @@ def main():
                 manifest.append({
                     "filename": filename,
                     "label": 0,
-                    "seriesuid": f"volume-{vid}",
+                    "seriesuid": f"liver_{vid}",
                 })
                 patch_idx += 1
                 total_neg_patches += 1
