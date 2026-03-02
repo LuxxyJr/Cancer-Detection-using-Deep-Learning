@@ -67,7 +67,7 @@ class FastPatchDataset(Dataset):
         ratio = n_neg // max(n_pos, 1)
         display_name = name or os.path.basename(patches_dir)
         print(f"    {display_name:5s}: {len(self.samples):5d} patches "
-              f"({n_pos} nodule, {n_neg} non-nodule, ratio 1:{ratio})")
+              f"({n_pos} positive, {n_neg} negative, ratio 1:{ratio})")
 
     def __len__(self):
         return len(self.samples)

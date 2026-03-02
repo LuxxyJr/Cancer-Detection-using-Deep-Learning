@@ -30,8 +30,9 @@ SEED = 42
 NEG_RATIO = 5
 PATCH_SIZE = (64, 64, 64)   # Cube -- enables full 3D rotation augmentation
 TARGET_SPACING = (1.0, 1.0, 1.0)  # Isotropic resampling in mm (Z, Y, X)
-LUNA_FOLDER = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\LUNA16"
-OUTPUT_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\patches"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LUNA_FOLDER = os.path.join(PROJECT_ROOT, "data", "LUNA16")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "patches")
 # ──────────────────────────────────────────────────────────────────────
 
 

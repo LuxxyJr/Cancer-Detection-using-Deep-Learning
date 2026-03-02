@@ -57,8 +57,9 @@ WARMUP_EPOCHS = 5       # Linear LR warmup epochs
 USE_FOCAL_LOSS = True   # Focal Loss instead of CrossEntropyLoss
 FOCAL_GAMMA = 2.0       # Focal Loss focusing parameter
 
-PATCHES_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\patches"
-RESULTS_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\results"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PATCHES_DIR = os.path.join(PROJECT_ROOT, "data", "patches")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, "results", "lung")
 CHECKPOINT_DIR = os.path.join(RESULTS_DIR, "checkpoints")
 PLOT_DIR = os.path.join(RESULTS_DIR, "plots")
 

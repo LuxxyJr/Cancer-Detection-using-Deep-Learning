@@ -93,7 +93,7 @@ class DataSplitter:
 
 if __name__ == "__main__":
     splitter = DataSplitter(
-        r"D:\Research Paper Work\Multi Organ Cancer Detector\data\LUNA16"
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "LUNA16")
     )
     train_cands, val_cands, test_cands, sizes = splitter.split()
 

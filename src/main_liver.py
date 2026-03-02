@@ -43,7 +43,7 @@ from gradcam import generate_gradcam_figures
 # CONFIGURATION
 # ======================================================================
 SEED = 42
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 EPOCHS = 100
 LR = 3e-4
 WEIGHT_DECAY = 1e-4
@@ -52,13 +52,15 @@ MIN_EPOCHS = 25         # Don't early-stop before this epoch
 NUM_WORKERS = 2
 K_FOLDS = 3
 VAL_FRACTION = 0.15
-ACCUM_STEPS = 4         # Gradient accumulation (effective batch = BATCH_SIZE * 4 = 16)
+ACCUM_STEPS = 2         # Gradient accumulation (effective batch = BATCH_SIZE * 2 = 16)
 WARMUP_EPOCHS = 5       # Linear LR warmup epochs
 USE_FOCAL_LOSS = True   # Focal Loss instead of CrossEntropyLoss
 FOCAL_GAMMA = 2.0       # Focal Loss focusing parameter
 
-PATCHES_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\liver_patches"
-RESULTS_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\results\liver"
+# Paths (relative to project root -- works on both Windows and Linux)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PATCHES_DIR = os.path.join(PROJECT_ROOT, "data", "liver_patches")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, "results", "liver")
 CHECKPOINT_DIR = os.path.join(RESULTS_DIR, "checkpoints")
 PLOT_DIR = os.path.join(RESULTS_DIR, "plots")
 

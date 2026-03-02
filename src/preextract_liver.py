@@ -18,7 +18,7 @@ Data format:
 
 Usage:  python preextract_liver.py
 Time:   ~30-60 minutes
-Disk:   ~5-10 GB in data/liver_patches/
+Disk:   ~10-20 GB in data/liver_patches/
 """
 
 import os
@@ -36,7 +36,7 @@ from utils import set_seed
 # ── Config ────────────────────────────────────────────────────────────
 SEED = 42
 NEG_RATIO = 5                      # Negatives per positive
-PATCH_SIZE = (64, 64, 64)          # Cubic patch for full 3D rotation augmentation
+PATCH_SIZE = (96, 96, 96)          # Larger cubic patch for liver (tumors are bigger than lung nodules)
 TARGET_SPACING = (1.0, 1.0, 1.0)  # Isotropic resampling in mm (Z, Y, X)
 MIN_TUMOR_VOXELS = 10              # Skip tumor fragments smaller than this
 MAX_PATCHES_PER_TUMOR = 3          # Max patches per tumor (centroid + random offsets)
@@ -48,8 +48,10 @@ LARGE_TUMOR_THRESHOLD = 1000       # Tumors larger than this (in voxels) get ext
 HU_MIN = -200.0
 HU_MAX = 300.0
 
-MSD_LIVER_FOLDER = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\Task03_Liver"
-OUTPUT_DIR = r"D:\Research Paper Work\Multi Organ Cancer Detector\data\liver_patches"
+# Paths (relative to project root -- works on both Windows and Linux)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MSD_LIVER_FOLDER = os.path.join(PROJECT_ROOT, "data", "Task03_Liver")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "liver_patches")
 # ──────────────────────────────────────────────────────────────────────
 
 
