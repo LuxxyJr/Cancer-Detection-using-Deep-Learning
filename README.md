@@ -197,8 +197,8 @@ Each organ follows a two-step pipeline: **extract patches** from raw CT volumes,
 ### Installation
 
 ```bash
-git clone https://github.com/LuxxyJr/Multi-Model-Unified-Organ-Cancer-Identifier.git
-cd Multi-Model-Unified-Organ-Cancer-Identifier
+git clone https://github.com/LuxxyJr/Cancer-Detection-using-Deep-Learning.git
+cd Cancer-Detection-using-Deep-Learning
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install numpy scipy scikit-learn matplotlib SimpleITK nibabel
 ```
