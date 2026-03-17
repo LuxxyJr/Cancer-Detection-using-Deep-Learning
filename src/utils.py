@@ -33,9 +33,9 @@ def save_checkpoint(model, optimizer, epoch, val_loss, path):
     }, path)
 
 
-def load_checkpoint(model, optimizer=None, path="checkpoint.pth"):
+def load_checkpoint(model, optimizer=None, path="checkpoint.pth", map_location="cpu"):
     """Load model checkpoint, optionally restoring optimizer state"""
-    checkpoint = torch.load(path, weights_only=False)
+    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

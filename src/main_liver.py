@@ -56,6 +56,8 @@ ACCUM_STEPS = 2         # Gradient accumulation (effective batch = BATCH_SIZE * 
 WARMUP_EPOCHS = 5       # Linear LR warmup epochs
 USE_FOCAL_LOSS = True   # Focal Loss instead of CrossEntropyLoss
 FOCAL_GAMMA = 2.0       # Focal Loss focusing parameter
+CHECKPOINT_METRIC = "val_auc"  # Select best checkpoint by validation AUC
+INPUT_PATCH_SIZE = (96, 96, 96)
 
 # Paths (relative to project root -- works on both Windows and Linux)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -170,10 +172,52 @@ def tta_predict(model, dataloader, device, use_amp):
         else:
             proba_sum += proba_arr
 
+    if all_labels is None or proba_sum is None:
+        raise ValueError("TTA dataloader is empty; cannot compute predictions.")
+
     avg_proba = proba_sum / len(augmentations)
     avg_preds = (avg_proba > 0.5).astype(int)
 
     return all_labels, avg_proba, avg_preds
+
+
+def build_balanced_patient_folds(manifest, k_folds, seed):
+    """
+    Build patient-level folds with better class balance.
+
+    A purely random split can produce folds with very different positive-case
+    counts, which makes AUC unstable across folds. This greedy assignment keeps
+    folds closer in both total samples and positive samples.
+    """
+    per_uid = {}
+    for s in manifest:
+        uid = s["seriesuid"]
+        if uid not in per_uid:
+            per_uid[uid] = {"total": 0, "pos": 0}
+        per_uid[uid]["total"] += 1
+        per_uid[uid]["pos"] += int(s["label"] == 1)
+
+    uids = list(per_uid.keys())
+    rng = random.Random(seed)
+    rng.shuffle(uids)
+
+    # Process higher-impact patients first (many positives / many samples)
+    uids.sort(key=lambda u: (per_uid[u]["pos"], per_uid[u]["total"]), reverse=True)
+
+    folds = [set() for _ in range(k_folds)]
+    fold_pos = [0 for _ in range(k_folds)]
+    fold_total = [0 for _ in range(k_folds)]
+
+    for uid in uids:
+        best_idx = min(
+            range(k_folds),
+            key=lambda i: (fold_pos[i], fold_total[i], len(folds[i]))
+        )
+        folds[best_idx].add(uid)
+        fold_pos[best_idx] += per_uid[uid]["pos"]
+        fold_total[best_idx] += per_uid[uid]["total"]
+
+    return folds
 
 
 # ======================================================================
@@ -302,6 +346,7 @@ def train_model_cv(model_config, manifest, folds, device, pipeline_start,
 
         train_losses, val_losses = [], []
         train_accs, val_accs = [], []
+        best_val_auc = -float("inf")
         best_val_loss = float("inf")
         patience_counter = 0
 
@@ -309,7 +354,7 @@ def train_model_cv(model_config, manifest, folds, device, pipeline_start,
             epoch_start = time.time()
 
             train_loss, train_acc = trainer.train_epoch(train_loader)
-            val_loss, val_acc = trainer.validate(val_loader)
+            val_loss, val_acc, val_auc = trainer.validate(val_loader)
 
             epoch_time = time.time() - epoch_start
             train_losses.append(train_loss)
@@ -325,12 +370,15 @@ def train_model_cv(model_config, manifest, folds, device, pipeline_start,
                 elapsed_total = time.time() - pipeline_start
                 print(f"    Ep {epoch+1:3d}/{EPOCHS} | "
                       f"TrL:{train_loss:.4f} TrA:{train_acc:.3f} | "
-                      f"VaL:{val_loss:.4f} VaA:{val_acc:.3f} | "
+                      f"VaL:{val_loss:.4f} VaA:{val_acc:.3f} VaAUC:{val_auc:.3f} | "
                       f"LR:{lr_now:.1e} | {epoch_time:.0f}s/ep | "
                       f"fold:{elapsed_fold/60:.0f}m total:{elapsed_total/60:.0f}m")
 
-            # Best model checkpoint
-            if val_loss < best_val_loss:
+            # Best model checkpoint (optimize for validation AUC)
+            is_better_auc = val_auc > best_val_auc + 1e-6
+            tie_breaker = abs(val_auc - best_val_auc) <= 1e-6 and val_loss < best_val_loss
+            if is_better_auc or tie_breaker:
+                best_val_auc = val_auc
                 best_val_loss = val_loss
                 patience_counter = 0
                 save_checkpoint(
@@ -357,8 +405,8 @@ def train_model_cv(model_config, manifest, folds, device, pipeline_start,
         fold_train_time = time.time() - fold_start
 
         print(f"\n  {model_name} Fold {fold_idx+1} training complete: "
-              f"{actual_epochs} epochs in {fold_train_time/60:.1f} min "
-              f"(best val loss: {best_val_loss:.4f})")
+               f"{actual_epochs} epochs in {fold_train_time/60:.1f} min "
+               f"(best val auc: {best_val_auc:.4f}, best val loss: {best_val_loss:.4f})")
 
         # Time estimate for remaining folds
         fold_times.append(fold_train_time)
@@ -586,18 +634,8 @@ def main():
     print("STEP 2: SETTING UP {}-FOLD CROSS-VALIDATION".format(K_FOLDS))
     print("-" * 80)
 
-    # Shuffle patients deterministically
-    rng = random.Random(SEED)
-    shuffled_uids = unique_uids.copy()
-    rng.shuffle(shuffled_uids)
-
-    # Split into K folds (by patient -- no data leakage)
-    fold_size = len(shuffled_uids) // K_FOLDS
-    folds = []
-    for i in range(K_FOLDS):
-        start_idx = i * fold_size
-        end_idx = start_idx + fold_size if i < K_FOLDS - 1 else len(shuffled_uids)
-        folds.append(set(shuffled_uids[start_idx:end_idx]))
+    # Balanced patient-level fold assignment (no leakage, lower fold skew)
+    folds = build_balanced_patient_folds(manifest, K_FOLDS, SEED)
 
     print(f"  Patient-level splitting (prevents data leakage):\n")
     for i, fold_uids in enumerate(folds):
@@ -775,12 +813,13 @@ def main():
     print(f"    Total patches:   {len(manifest)} "
           f"({n_pos} tumor, {n_neg} non-tumor)")
     print(f"    Unique patients: {len(unique_uids)}")
-    print(f"    Patch size:      64x64x64 at 1mm isotropic")
+    print(f"    Patch size:      {INPUT_PATCH_SIZE[0]}x{INPUT_PATCH_SIZE[1]}x{INPUT_PATCH_SIZE[2]} at 1mm isotropic")
     print(f"    HU window:       [-200, 300]")
     print(f"    Class balance:   WeightedRandomSampler (50/50 in each batch)")
     print(f"    Val fraction:    {VAL_FRACTION:.0%} of non-test patients")
     loss_name = f"Focal Loss (gamma={FOCAL_GAMMA})" if USE_FOCAL_LOSS else "CrossEntropyLoss"
     print(f"    Loss function:   {loss_name}")
+    print(f"    Checkpoint rule: Best {CHECKPOINT_METRIC} on validation set")
     print(f"    Augmentation:    3D flips (all axes), 90-deg rotation (all planes), "
           f"Gaussian noise, intensity shift/scale")
     print(f"    Test-time aug:   7 geometric transforms averaged")
@@ -790,7 +829,7 @@ def main():
         print(f"    Architecture:    {name}")
         print(f"    Parameters:      {res['total_params']/1e6:.2f}M "
               f"({res['total_params']:,})")
-        print(f"    Input shape:     (1, 64, 64, 64) at 1mm isotropic")
+        print(f"    Input shape:     (1, {INPUT_PATCH_SIZE[0]}, {INPUT_PATCH_SIZE[1]}, {INPUT_PATCH_SIZE[2]}) at 1mm isotropic")
         print(f"    Optimizer:       AdamW (lr={LR}, wd={WEIGHT_DECAY})")
         print(f"    Scheduler:       LinearWarmup({WARMUP_EPOCHS}ep) + CosineAnnealingLR")
         print(f"    Grad accumulation: {ACCUM_STEPS} steps (effective batch={BATCH_SIZE*ACCUM_STEPS})")

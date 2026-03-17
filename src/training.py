@@ -7,6 +7,7 @@ Designed for RTX 4050 (6GB VRAM) -- uses mixed precision when CUDA is available.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import roc_auc_score
 
 
 class FocalLoss(nn.Module):
@@ -141,11 +142,13 @@ class Trainer:
 
     @torch.no_grad()
     def validate(self, loader):
-        """Evaluate on validation/test set. Returns (avg_loss, accuracy)."""
+        """Evaluate on validation/test set. Returns (avg_loss, accuracy, auc_roc)."""
         self.model.eval()
         total_loss = 0
         correct = 0
         total = 0
+        all_labels = []
+        all_proba = []
 
         for x, y in loader:
             x = x.to(self.device)
@@ -164,6 +167,16 @@ class Trainer:
             correct += (preds == y).sum().item()
             total += y.size(0)
 
+            proba = F.softmax(logits, dim=1)[:, 1]
+            all_labels.extend(y.detach().cpu().tolist())
+            all_proba.extend(proba.detach().cpu().tolist())
+
         avg_loss = total_loss / max(len(loader), 1)
         accuracy = correct / max(total, 1)
-        return avg_loss, accuracy
+
+        if len(set(all_labels)) >= 2:
+            auc_roc = roc_auc_score(all_labels, all_proba)
+        else:
+            auc_roc = 0.0
+
+        return avg_loss, accuracy, auc_roc

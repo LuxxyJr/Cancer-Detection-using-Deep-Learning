@@ -2,7 +2,7 @@
 
 A deep learning framework for automated cancer detection across multiple organs using 3D convolutional neural networks. The system processes volumetric CT scans and classifies regions of interest as malignant or benign, with interpretable Grad-CAM visualizations for clinical transparency.
 
-This project accompanies a research paper investigating whether lightweight 3D architectures can achieve high diagnostic accuracy on consumer-grade hardware (6 GB VRAM), making advanced cancer screening more accessible.
+This project accompanies a research paper investigating whether lightweight 3D architectures can achieve high diagnostic accuracy on both consumer-grade and cloud GPUs, making advanced cancer screening more accessible.
 
 ---
 
@@ -19,7 +19,7 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ### Shared Training Configuration
 
-- **Validation:** Stratified 3-fold cross-validation
+- **Validation:** Patient-level 3-fold cross-validation
 - **Loss:** Focal Loss (gamma=2, alpha=0.25) for class imbalance
 - **Optimizer:** AdamW with cosine annealing + linear warmup
 - **Regularization:** Dropout, weight decay, early stopping (patience=25)
@@ -90,13 +90,60 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ---
 
-### Liver Cancer Detection — In Progress
+### Liver Cancer Detection — Complete
 
 **Dataset:** [Medical Segmentation Decathlon — Task03 Liver](http://medicaldecathlon.com/) (131 training CT scans with pixel-level segmentation masks)
 
-**Preprocessing:** NIfTI volumes resampled to 1 mm isotropic, HU-windowed to [-200, 300] for liver parenchyma. Tumor centroids extracted from connected components in segmentation masks. Negatives sampled from verified tumor-free liver regions.
+**Preprocessing:** NIfTI volumes were resampled to 1 mm isotropic, HU-windowed to [-200, 300], and converted into 96x96x96 patches. Positive patches were centered on tumor components; negatives were sampled from tumor-free liver regions.
 
-*Results will be published here upon completion of training.*
+<table>
+<tr>
+<th>Model</th><th>AUC-ROC</th><th>Sensitivity</th><th>Specificity</th><th>F1 Score</th><th>Accuracy</th>
+</tr>
+<tr>
+<td><b>ResNet3D</b></td><td>0.8297 +/- 0.1100</td><td>0.6899 +/- 0.1434</td><td>0.8526 +/- 0.0577</td><td>0.6846 +/- 0.1251</td><td>0.8019 +/- 0.0791</td>
+</tr>
+<tr>
+<td><b>VGG3D</b></td><td>0.9464 +/- 0.0105</td><td>0.8456 +/- 0.0231</td><td>0.9444 +/- 0.0090</td><td>0.8599 +/- 0.0204</td><td>0.9133 +/- 0.0139</td>
+</tr>
+</table>
+
+*All values reported as mean +/- standard deviation across 3 folds (5,030 test samples).* 
+
+**Key finding:** VGG3D outperformed ResNet3D across all metrics with substantially lower variance and faster training time (194.1 min vs 307.1 min), indicating better stability for this liver task.
+
+#### ROC Curves
+
+<p align="center">
+<img src="results/liver/plots/comparison_roc.png" width="600" alt="Comparison ROC curves for liver tumor classification">
+</p>
+
+#### Training Curves
+
+<p align="center">
+<img src="results/liver/plots/resnet3d/training_curves_kfold.png" width="48%" alt="ResNet3D liver training curves">
+<img src="results/liver/plots/vgg3d/training_curves_kfold.png" width="48%" alt="VGG3D liver training curves">
+</p>
+
+#### Grad-CAM Visualizations
+
+**VGG3D:**
+<p align="center">
+<img src="results/liver/plots/gradcam/vgg3d/tp_1.png" width="24%">
+<img src="results/liver/plots/gradcam/vgg3d/tn_1.png" width="24%">
+<img src="results/liver/plots/gradcam/vgg3d/fp_1.png" width="24%">
+<img src="results/liver/plots/gradcam/vgg3d/fn_1.png" width="24%">
+</p>
+<p align="center"><i>Left to right: True Positive, True Negative, False Positive, False Negative</i></p>
+
+**ResNet3D:**
+<p align="center">
+<img src="results/liver/plots/gradcam/resnet3d/tp_1.png" width="24%">
+<img src="results/liver/plots/gradcam/resnet3d/tn_1.png" width="24%">
+<img src="results/liver/plots/gradcam/resnet3d/fp_1.png" width="24%">
+<img src="results/liver/plots/gradcam/resnet3d/fn_1.png" width="24%">
+</p>
+<p align="center"><i>Left to right: True Positive, True Negative, False Positive, False Negative</i></p>
 
 ---
 
@@ -124,8 +171,11 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 │   ├── preextract_liver.py      # Liver: LiTS patch extraction pipeline
 │   └── main_liver.py            # Liver: training and evaluation entry point
 ├── results/
-│   └── lung/
-│       ├── plots/               # ROC curves, training curves, Grad-CAM figures
+│   ├── lung/
+│   │   ├── plots/               # Lung ROC curves, training curves, Grad-CAM figures
+│   │   └── checkpoints/         # Trained model weights (not tracked in git)
+│   └── liver/
+│       ├── plots/               # Liver ROC curves, training curves, Grad-CAM figures
 │       └── checkpoints/         # Trained model weights (not tracked in git)
 ├── data/
 │   └── LUNA16_csv_backup/       # Annotation and candidate CSVs
@@ -186,12 +236,13 @@ This project was designed and tested under strict hardware constraints to demons
 
 | Component | Specification |
 |-----------|--------------|
-| GPU | NVIDIA RTX 4050 Laptop (6 GB VRAM) |
+| GPU (Lung experiments) | NVIDIA RTX 4050 Laptop (6 GB VRAM) |
+| GPU (Liver experiments) | NVIDIA A100-SXM4-40GB MIG 3g.20gb (20 GB VRAM, AI Kosh cloud) |
 | RAM | 16 GB DDR5 |
 | Storage | NVMe SSD (30+ GB free per organ) |
 | OS | Windows 11 |
 
-Mixed-precision training and gradient accumulation enable an effective batch size of 16 within the 6 GB VRAM budget.
+Mixed-precision training and gradient accumulation enable an effective batch size of 16. Lung experiments demonstrate consumer-GPU feasibility; liver experiments demonstrate cloud-GPU scaling and improved throughput.
 
 ---
 
