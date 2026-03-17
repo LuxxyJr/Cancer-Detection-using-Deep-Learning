@@ -92,7 +92,7 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ### Liver Cancer Detection — Complete
 
-**Dataset:** [Medical Segmentation Decathlon — Task03 Liver](http://medicaldecathlon.com/) (131 training CT scans with pixel-level segmentation masks)
+**Dataset:** [LiTS — Liver Tumor Segmentation Challenge](https://competitions.codalab.org/competitions/17094) (131 contrast-enhanced abdominal CT scans with tumor masks). For pipeline compatibility, files are organized in `data/Task03_Liver/` format (`imagesTr` and `labelsTr`).
 
 **Preprocessing:** NIfTI volumes were resampled to 1 mm isotropic, HU-windowed to [-200, 300], and converted into 96x96x96 patches. Positive patches were centered on tumor components; negatives were sampled from tumor-free liver regions.
 
@@ -149,7 +149,7 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ### Pancreas Cancer Detection — Planned
 
-**Dataset:** [Medical Segmentation Decathlon — Pancreas](http://medicaldecathlon.com/) (281 CT scans)
+**Dataset:** [The Cancer Imaging Archive (TCIA)](https://www.cancerimagingarchive.net/) — Pancreatic Cancer CT collection
 
 *Implementation pending.*
 
@@ -217,8 +217,8 @@ python src/main.py
 ### Running the Liver Pipeline
 
 ```bash
-# Step 1: Download Task03_Liver.tar from http://medicaldecathlon.com/dataaws/
-# Step 2: Extract to data/Task03_Liver/
+# Step 1: Download LiTS training CT volumes + tumor masks
+# Step 2: Place them in data/Task03_Liver/imagesTr and data/Task03_Liver/labelsTr
 # Step 3: Extract patches (run once, ~30-60 minutes)
 python src/preextract_liver.py
 
