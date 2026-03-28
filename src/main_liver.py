@@ -56,6 +56,7 @@ ACCUM_STEPS = 2         # Gradient accumulation (effective batch = BATCH_SIZE * 
 WARMUP_EPOCHS = 5       # Linear LR warmup epochs
 USE_FOCAL_LOSS = True   # Focal Loss instead of CrossEntropyLoss
 FOCAL_GAMMA = 2.0       # Focal Loss focusing parameter
+TRAIN_AUGMENT = True
 CHECKPOINT_METRIC = "val_auc"  # Select best checkpoint by validation AUC
 INPUT_PATCH_SIZE = (96, 96, 96)
 
@@ -70,6 +71,10 @@ PLOT_DIR = os.path.join(RESULTS_DIR, "plots")
 POS_LABEL = "Tumor"
 NEG_LABEL = "Non-tumor"
 ORGAN_NAME = "MSD Liver Tumor"
+DATASET_NAME = "MSD Task03 Liver (Medical Segmentation Decathlon)"
+TASK_DESCRIPTION = "Binary classification"
+PREEXTRACT_HINT = "python src/preextract_liver.py"
+HU_WINDOW_DESC = "[-200, 300]"
 
 # Models to train and compare
 # Each entry: (display_name, architecture_key, gradcam_target_layer_path)
@@ -88,8 +93,8 @@ def read_manifest(patches_dir):
     manifest_path = os.path.join(patches_dir, "manifest.csv")
     if not os.path.exists(manifest_path):
         print(f"\n  ERROR: {manifest_path} not found!")
-        print(f"  Run preextract_liver.py first to create patch files.")
-        print(f"  Usage:  python preextract_liver.py\n")
+        print("  Run the organ pre-extraction step first to create patch files.")
+        print(f"  Usage:  {PREEXTRACT_HINT}\n")
         return None
 
     samples = []
@@ -298,7 +303,7 @@ def train_model_cv(model_config, manifest, folds, device, pipeline_start,
         # ── Create datasets ──────────────────────────────────────────
         print(f"  Datasets:")
         train_dataset = FastPatchDataset(
-            PATCHES_DIR, augment=True, samples=train_all, name="train"
+            PATCHES_DIR, augment=TRAIN_AUGMENT, samples=train_all, name="train"
         )
         val_dataset = FastPatchDataset(
             PATCHES_DIR, augment=False, samples=val_all, name="val"
@@ -805,23 +810,26 @@ def main():
     print("=" * 80)
 
     print(f"\n  METHODOLOGY:")
-    print(f"    Organ:           Liver")
-    print(f"    Dataset:         MSD Task03 Liver (Medical Segmentation Decathlon)")
-    print(f"    Task:            Binary classification ({POS_LABEL} vs {NEG_LABEL})")
+    print(f"    Organ:           {ORGAN_NAME}")
+    print(f"    Dataset:         {DATASET_NAME}")
+    print(f"    Task:            {TASK_DESCRIPTION} ({POS_LABEL} vs {NEG_LABEL})")
     print(f"    Validation:      {K_FOLDS}-fold cross-validation")
     print(f"    Split strategy:  Patient-level (prevents data leakage)")
     print(f"    Total patches:   {len(manifest)} "
-          f"({n_pos} tumor, {n_neg} non-tumor)")
+          f"({n_pos} {POS_LABEL.lower()}, {n_neg} {NEG_LABEL.lower()})")
     print(f"    Unique patients: {len(unique_uids)}")
     print(f"    Patch size:      {INPUT_PATCH_SIZE[0]}x{INPUT_PATCH_SIZE[1]}x{INPUT_PATCH_SIZE[2]} at 1mm isotropic")
-    print(f"    HU window:       [-200, 300]")
+    print(f"    HU window:       {HU_WINDOW_DESC}")
     print(f"    Class balance:   WeightedRandomSampler (50/50 in each batch)")
     print(f"    Val fraction:    {VAL_FRACTION:.0%} of non-test patients")
     loss_name = f"Focal Loss (gamma={FOCAL_GAMMA})" if USE_FOCAL_LOSS else "CrossEntropyLoss"
     print(f"    Loss function:   {loss_name}")
     print(f"    Checkpoint rule: Best {CHECKPOINT_METRIC} on validation set")
-    print(f"    Augmentation:    3D flips (all axes), 90-deg rotation (all planes), "
-          f"Gaussian noise, intensity shift/scale")
+    if TRAIN_AUGMENT:
+        print("    Augmentation:    3D flips (all axes), 90-deg rotation (all planes), "
+              "Gaussian noise, intensity shift/scale")
+    else:
+        print("    Augmentation:    Disabled")
     print(f"    Test-time aug:   7 geometric transforms averaged")
 
     for name, res in all_model_results.items():

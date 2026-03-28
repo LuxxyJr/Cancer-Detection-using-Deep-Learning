@@ -147,11 +147,60 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 
 ---
 
-### Pancreas Cancer Detection — Planned
+### Pancreas Cancer Detection — Complete
 
-**Dataset:** [The Cancer Imaging Archive (TCIA)](https://www.cancerimagingarchive.net/) — Pancreatic Cancer CT collection
+**Dataset:** [The Cancer Imaging Archive (TCIA)](https://www.cancerimagingarchive.net/) — Pancreatic Cancer CT collection (80 labeled cases)
 
-*Implementation pending.*
+**Preprocessing:** CT DICOM series and NIfTI labels were paired by case ID, aligned to CT geometry, resampled to 1 mm isotropic, HU-windowed to [-150, 250], and converted into 96x96x96 patches. For this TCIA label set, positive voxels are encoded as label `1`, so tumor-positive extraction is forced accordingly.
+
+<table>
+<tr>
+<th>Model</th><th>AUC-ROC</th><th>Sensitivity</th><th>Specificity</th><th>F1 Score</th><th>Accuracy</th>
+</tr>
+<tr>
+<td><b>ResNet3D</b></td><td>0.9965 +/- 0.0024</td><td>0.9797 +/- 0.0152</td><td>0.9624 +/- 0.0235</td><td>0.9065 +/- 0.0489</td><td>0.9653 +/- 0.0201</td>
+</tr>
+<tr>
+<td><b>VGG3D</b></td><td>0.9980 +/- 0.0010</td><td>0.9633 +/- 0.0198</td><td>0.9868 +/- 0.0063</td><td>0.9496 +/- 0.0149</td><td>0.9829 +/- 0.0051</td>
+</tr>
+</table>
+
+*All values reported as mean +/- standard deviation across 3 folds (1,464 patches: 244 positive, 1,220 negative).* 
+
+**Key finding:** Both models exceeded 0.99 mean AUC on pancreas classification. VGG3D achieved the strongest overall balance (higher specificity, F1, and accuracy), while ResNet3D reached the highest sensitivity.
+
+#### ROC Curves
+
+<p align="center">
+<img src="results/pancreas/plots/comparison_roc.png" width="600" alt="Comparison ROC curves for pancreas tumor classification">
+</p>
+
+#### Training Curves
+
+<p align="center">
+<img src="results/pancreas/plots/resnet3d/training_curves_kfold.png" width="48%" alt="ResNet3D pancreas training curves">
+<img src="results/pancreas/plots/vgg3d/training_curves_kfold.png" width="48%" alt="VGG3D pancreas training curves">
+</p>
+
+#### Grad-CAM Visualizations
+
+**VGG3D:**
+<p align="center">
+<img src="results/pancreas/plots/gradcam/vgg3d/tp_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/vgg3d/tn_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/vgg3d/fp_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/vgg3d/fn_1.png" width="24%">
+</p>
+<p align="center"><i>Left to right: True Positive, True Negative, False Positive, False Negative</i></p>
+
+**ResNet3D:**
+<p align="center">
+<img src="results/pancreas/plots/gradcam/resnet3d/tp_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/resnet3d/tn_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/resnet3d/fp_1.png" width="24%">
+<img src="results/pancreas/plots/gradcam/resnet3d/fn_1.png" width="24%">
+</p>
+<p align="center"><i>Left to right: True Positive, True Negative, False Positive, False Negative</i></p>
 
 ---
 
@@ -169,13 +218,19 @@ Both architectures are organ-agnostic. The same model definitions are reused acr
 │   ├── preextract.py            # Lung: LUNA16 patch extraction pipeline
 │   ├── main.py                  # Lung: training and evaluation entry point
 │   ├── preextract_liver.py      # Liver: LiTS patch extraction pipeline
-│   └── main_liver.py            # Liver: training and evaluation entry point
+│   ├── main_liver.py            # Liver: training and evaluation entry point
+│   ├── preextract_pancreas.py   # Pancreas: TCIA patch extraction pipeline
+│   ├── verify_pancreas_patches.py # Pancreas: extraction integrity checks
+│   └── main_pancreas.py         # Pancreas: training and evaluation entry point
 ├── results/
 │   ├── lung/
 │   │   ├── plots/               # Lung ROC curves, training curves, Grad-CAM figures
 │   │   └── checkpoints/         # Trained model weights (not tracked in git)
-│   └── liver/
-│       ├── plots/               # Liver ROC curves, training curves, Grad-CAM figures
+│   ├── liver/
+│   │   ├── plots/               # Liver ROC curves, training curves, Grad-CAM figures
+│   │   └── checkpoints/         # Trained model weights (not tracked in git)
+│   └── pancreas/
+│       ├── plots/               # Pancreas ROC curves, training curves, Grad-CAM figures
 │       └── checkpoints/         # Trained model weights (not tracked in git)
 ├── data/
 │   └── LUNA16_csv_backup/       # Annotation and candidate CSVs
@@ -226,6 +281,23 @@ python src/preextract_liver.py
 python src/main_liver.py
 ```
 
+### Running the Pancreas Pipeline
+
+```bash
+# Step 1: Download TCIA pancreas CT + labels
+# Step 2: Place raw data under data/Pancreas Dataset/
+#         (manifest-*/Pancreas-CT/PANCREAS_XXXX/.../*.dcm and
+#          TCIA_pancreas_labels-*/labelXXXX.nii.gz)
+# Step 3: Extract patches (run once)
+python src/preextract_pancreas.py
+
+# Step 4: Verify extraction integrity
+python src/verify_pancreas_patches.py
+
+# Step 5: Train both models with 3-fold CV
+python src/main_pancreas.py
+```
+
 After training completes for each organ, raw data and extracted patches can be safely deleted. Only checkpoints (~50 MB) and result plots are retained.
 
 ---
@@ -238,6 +310,7 @@ This project was designed and tested under strict hardware constraints to demons
 |-----------|--------------|
 | GPU (Lung experiments) | NVIDIA RTX 4050 Laptop (6 GB VRAM) |
 | GPU (Liver experiments) | NVIDIA A100-SXM4-40GB MIG 3g.20gb (20 GB VRAM, AI Kosh cloud) |
+| GPU (Pancreas experiments) | NVIDIA A100-SXM4-40GB MIG 3g.20gb (20 GB VRAM, AI Kosh cloud) |
 | RAM | 16 GB DDR5 |
 | Storage | NVMe SSD (30+ GB free per organ) |
 | OS | Windows 11 |
